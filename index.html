@@ -464,17 +464,38 @@ let _pushTimer = null, _syncing = false;
 const dot = () => document.getElementById('syncDot');
 function setDot(cls) { dot().className = 'sync-dot' + (cls ? ' ' + cls : ''); }
 
-async function api(payload) {
-  if (!cfg.apiUrl || !cfg.token) throw new Error('nincs beállítva');
+function api(payload) {
+  if (!cfg.apiUrl || !cfg.token) return Promise.reject(new Error('nincs beállítva'));
   var body = JSON.stringify(Object.assign({ token: cfg.token }, payload));
   var encoded = btoa(unescape(encodeURIComponent(body)));
-  var url = cfg.apiUrl + '?d=' + encodeURIComponent(encoded);
-  var res = await fetch(url);
-  var text = await res.text();
-  var j;
-  try { j = JSON.parse(text); } catch (e) { throw new Error('Nem JSON válasz: ' + text.slice(0, 100)); }
-  if (!j.ok) throw new Error(j.error || 'hiba');
-  return j;
+  return new Promise(function(resolve, reject) {
+    var cbName = '_azscb_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    var script = document.createElement('script');
+    var done = false;
+    var timer = setTimeout(function() {
+      if (done) return; done = true;
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('Időtúllépés (15s)'));
+    }, 15000);
+    window[cbName] = function(data) {
+      if (done) return; done = true;
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      if (data && data.ok) resolve(data);
+      else reject(new Error((data && data.error) || 'hiba'));
+    };
+    script.onerror = function() {
+      if (done) return; done = true;
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('Script betöltés sikertelen'));
+    };
+    script.src = cfg.apiUrl + '?d=' + encodeURIComponent(encoded) + '&cb=' + cbName;
+    document.head.appendChild(script);
+  });
 }
 
 function schedulePush() {
@@ -1189,20 +1210,35 @@ function openSettings() {
       cfg.token=document.getElementById('set-token').value.trim();
       saveCfg(); closeAllModals(); toast('Beállítások mentve'); pullState(false); });
 }
-async function testConnection() {
-  const st=document.getElementById('set-status');
+function testConnection() {
+  var st=document.getElementById('set-status');
   st.textContent='Tesztelés…'; st.className='set-status';
-  const url=document.getElementById('set-url').value.trim();
-  const token=document.getElementById('set-token').value.trim();
-  try {
-    var body=JSON.stringify({token:token,action:'pull'});
-    var encoded=btoa(unescape(encodeURIComponent(body)));
-    const res=await fetch(url+'?d='+encodeURIComponent(encoded));
-    const text=await res.text();
-    var j; try { j=JSON.parse(text); } catch(pe) { st.textContent='Nem JSON válasz: '+text.slice(0,80); st.className='set-status err'; return; }
-    if(j.ok){ st.textContent='Kapcsolat él.'; st.className='set-status ok'; }
-    else { st.textContent='Hiba: '+(j.error||'ismeretlen'); st.className='set-status err'; }
-  } catch(e){ st.textContent='Nem érhető el: '+e.message; st.className='set-status err'; }
+  var url=document.getElementById('set-url').value.trim();
+  var token=document.getElementById('set-token').value.trim();
+  if(!url||!token){ st.textContent='Töltsd ki mindkét mezőt.'; st.className='set-status err'; return; }
+  var body=JSON.stringify({token:token,action:'pull'});
+  var encoded=btoa(unescape(encodeURIComponent(body)));
+  var cbName='_aztst_'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done) return; done=true;
+    delete window[cbName]; if(script.parentNode) script.parentNode.removeChild(script);
+    st.textContent='Időtúllépés — ellenőrizd az URL-t és hogy deployoltad-e.'; st.className='set-status err';
+  },15000);
+  window[cbName]=function(data){
+    if(done) return; done=true;
+    clearTimeout(timer); delete window[cbName]; if(script.parentNode) script.parentNode.removeChild(script);
+    if(data&&data.ok){ st.textContent='Kapcsolat él.'; st.className='set-status ok'; }
+    else { st.textContent='Hiba: '+((data&&data.error)||'ismeretlen'); st.className='set-status err'; }
+  };
+  script.onerror=function(){
+    if(done) return; done=true;
+    clearTimeout(timer); delete window[cbName]; if(script.parentNode) script.parentNode.removeChild(script);
+    st.textContent='Nem érhető el — ellenőrizd az URL-t.'; st.className='set-status err';
+  };
+  script.src=url+'?d='+encodeURIComponent(encoded)+'&cb='+cbName;
+  document.head.appendChild(script);
 }
 function doImport() {
   const raw=document.getElementById('set-import').value.trim();
