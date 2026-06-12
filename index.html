@@ -294,6 +294,16 @@
     .set-status.ok { color:var(--green); } .set-status.err { color:var(--red); }
     ::-webkit-scrollbar { width:5px; height:5px; }
     ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+    /* ── DRAG & DROP (csak desktop) ── */
+    @media (pointer:fine) {
+      .cal-chip[draggable="true"], .fu-card[draggable="true"] { cursor:grab; }
+      .cal-chip[draggable="true"]:active, .fu-card[draggable="true"]:active { cursor:grabbing; }
+      .wday-body.drag-over, .fu-day-cards.drag-over {
+        background:rgba(88,166,255,.12); border-radius:6px;
+        outline:2px dashed var(--blue); outline-offset:-2px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -311,55 +321,17 @@
 </header>
 
 <!-- ════ FELADATOK ════ -->
-<div class="page active" id="page-tasks">
-  <div class="pending-sec" id="taskPendingSec">
-    <div class="seclabel">E-mailből jelölt feladatok — jóváhagyásra várnak</div>
-    <div id="taskPendingList"></div>
-  </div>
-  <div class="board">
-    <div class="column col-important">
-      <div class="column-header"><span class="dot"></span><h2>Fontos</h2></div>
-      <div class="add-area">
-        <div class="add-row">
-          <input id="input-important" type="text" placeholder="Feladat hozzáadása…" maxlength="200">
-          <button class="btn-add" onclick="addManual('important')">+</button>
-          <button class="btn-clock" onclick="toggleScheduler('important')" title="Időzített">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </button>
-        </div>
-        <div class="date-row"><label>Naptárba:</label><input type="date" id="date-important"></div>
-        <div class="scheduler-row" id="scheduler-important">
-          <input type="datetime-local" id="dt-important">
-          <button class="btn-sched-confirm" onclick="addScheduled('important')">Mentés</button>
-          <button class="btn-sched-cancel" onclick="toggleScheduler('important')">×</button>
-        </div>
-      </div>
-      <ul class="task-list" id="list-important"></ul>
-    </div>
-    <div class="column col-low">
-      <div class="column-header"><span class="dot"></span><h2>Kevésbé fontos</h2></div>
-      <div class="add-area">
-        <div class="add-row">
-          <input id="input-low" type="text" placeholder="Feladat hozzáadása…" maxlength="200">
-          <button class="btn-add" onclick="addManual('low')">+</button>
-          <button class="btn-clock" onclick="toggleScheduler('low')" title="Időzített">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </button>
-        </div>
-        <div class="date-row"><label>Naptárba:</label><input type="date" id="date-low"></div>
-        <div class="scheduler-row" id="scheduler-low">
-          <input type="datetime-local" id="dt-low">
-          <button class="btn-sched-confirm" onclick="addScheduled('low')">Mentés</button>
-          <button class="btn-sched-cancel" onclick="toggleScheduler('low')">×</button>
-        </div>
-      </div>
-      <ul class="task-list" id="list-low"></ul>
-    </div>
-  </div>
+<!-- Rejtett elemek a JS kompatibilitáshoz (tasks adatmodell él, de nincs önálló oldala) -->
+<div style="display:none" id="page-tasks">
+  <div id="taskPendingSec"><div id="taskPendingList"></div></div>
+  <input id="input-important"><input id="date-important"><input id="dt-important">
+  <div id="scheduler-important"></div><ul id="list-important"></ul>
+  <input id="input-low"><input id="date-low"><input id="dt-low">
+  <div id="scheduler-low"></div><ul id="list-low"></ul>
 </div>
 
 <!-- ════ JELENLÉT ════ -->
-<div class="page" id="page-presence">
+<div class="page active" id="page-presence">
   <div class="board-presence" id="presence-board"></div>
 </div>
 
@@ -407,11 +379,7 @@
 
 <!-- BOTTOM NAV -->
 <nav class="bnav">
-  <button class="active" data-page="tasks" onclick="goPage('tasks',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-    Feladatok
-  </button>
-  <button data-page="presence" onclick="goPage('presence',this)">
+  <button class="active" data-page="presence" onclick="goPage('presence',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg>
     Jelenlét
   </button>
@@ -579,8 +547,8 @@ function fmtDisp(s){ if(!s) return ''; const d=fuFromStr(s); return `${MON_SHORT
 // ════════════════════════════════════════════════════════════
 // NAVIGÁCIÓ
 // ════════════════════════════════════════════════════════════
-const PAGE_TITLES = { tasks:'Feladatok', presence:'Jelenlétes feladatok', calendar:'Naptár', followup:'Follow Up' };
-let currentPage = 'tasks';
+const PAGE_TITLES = { presence:'Jelenlétes feladatok', calendar:'Naptár', followup:'Follow Up' };
+let currentPage = 'presence';
 function goPage(name, btn) {
   currentPage = name;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -743,22 +711,46 @@ function renderCalendar() {
   getCalTasks().forEach(t=>{ (byDate[t.date]=byDate[t.date]||[]).push(t); });
 
   const list=document.getElementById('week-list'); list.innerHTML='';
+  const isDesktop=window.matchMedia('(pointer:fine)').matches;
   days.forEach((day,di)=>{
     const dateStr=toDateStr(day);
     const row=document.createElement('div'); row.className='wday'+(dateStr===todayStr?' today':'');
     const head=document.createElement('div'); head.className='wday-head';
     head.innerHTML=`<span class="wday-dow">${HU_DAYS_SHORT[di]}</span><span class="wday-num">${day.getDate()}</span>`;
     const body=document.createElement('div'); body.className='wday-body';
+    if(isDesktop){
+      body.dataset.date=dateStr;
+      body.addEventListener('dragover',calDragOver);
+      body.addEventListener('dragleave',calDragLeave);
+      body.addEventListener('drop',calDrop);
+    }
     (byDate[dateStr]||[]).forEach(task=>{
       const chip=document.createElement('div'); chip.className='cal-chip '+task.type+(task.done?' done-chip':'');
       chip.innerHTML=`<span class="cal-chip-text">${esc(task.text)}</span>`;
       chip.onclick=()=>openTaskDetail(task);
+      if(isDesktop){
+        chip.draggable=true;
+        chip.addEventListener('dragstart',function(ev){
+          ev.dataTransfer.setData('application/cal-task',JSON.stringify({type:task.type,priority:task.priority,idx:task.idx,coId:task.coId}));
+          ev.dataTransfer.effectAllowed='move';
+          this.style.opacity='0.4';
+        });
+        chip.addEventListener('dragend',function(){ this.style.opacity=''; });
+      }
       body.appendChild(chip);
     });
     if(!body.hasChildNodes()){ const eh=document.createElement('div'); eh.className='empty-day'; eh.textContent='·'; body.appendChild(eh); }
     head.onclick=()=>openCalModal(dateStr);
     row.appendChild(head); row.appendChild(body); list.appendChild(row);
   });
+}
+function calDragOver(ev){ ev.preventDefault(); ev.dataTransfer.dropEffect='move'; this.classList.add('drag-over'); }
+function calDragLeave(){ this.classList.remove('drag-over'); }
+function calDrop(ev){
+  ev.preventDefault(); this.classList.remove('drag-over');
+  var raw=ev.dataTransfer.getData('application/cal-task'); if(!raw) return;
+  var ref=JSON.parse(raw); var newDate=this.dataset.date;
+  updateTaskDate(ref,newDate); renderCalendar(); renderPresence(); toast('Áthelyezve');
 }
 
 // Naptár modál (feladat hozzáadása)
@@ -884,6 +876,7 @@ function fuRenderGrid() {
   grid.style.display=''; wrap.style.display='none';
   grid.innerHTML='';
   const dayEls={};
+  const isDesktop=window.matchMedia('(pointer:fine)').matches;
   for(let i=0;i<7;i++){
     const day=addDays(FU.weekStart,i), dayStr=fuToStr(day);
     const col=document.createElement('div'); col.className=`fu-day${isToday(day)?' today':''}`;
@@ -891,7 +884,14 @@ function fuRenderGrid() {
       <span class="fu-day-num">${day.getDate()}</span><span class="fu-day-mon">${MON_SHORT[day.getMonth()]}.</span></div>
       <div class="fu-day-cards"></div>`;
     grid.appendChild(col);
-    dayEls[dayStr]=col.querySelector('.fu-day-cards');
+    const cards=col.querySelector('.fu-day-cards');
+    if(isDesktop){
+      cards.dataset.fudate=dayStr;
+      cards.addEventListener('dragover',fuDragOver);
+      cards.addEventListener('dragleave',fuDragLeave);
+      cards.addEventListener('drop',fuDrop);
+    }
+    dayEls[dayStr]=cards;
   }
   const tabType = FU.tab==='external' ? 'external' : 'internal';
   for (const fu of state.fu.filter(f=>f.type===tabType)) {
@@ -907,6 +907,16 @@ function fuRenderGrid() {
       if (fuInWeek(vfu.date) && dayEls[vfu.date]) dayEls[vfu.date].appendChild(makeLeadFUCard(vfu, lead, 'cold'));
   }
   Object.values(dayEls).forEach(c=>{ if(!c.hasChildNodes()) c.innerHTML='<div class="empty-day">·</div>'; });
+}
+function fuDragOver(ev){ ev.preventDefault(); ev.dataTransfer.dropEffect='move'; this.classList.add('drag-over'); }
+function fuDragLeave(){ this.classList.remove('drag-over'); }
+function fuDrop(ev){
+  ev.preventDefault(); this.classList.remove('drag-over');
+  var raw=ev.dataTransfer.getData('application/fu-card'); if(!raw) return;
+  var ref=JSON.parse(raw); var newDate=this.dataset.fudate;
+  var fu=state.fu.find(function(f){ return f.id===ref.fuId; }); if(!fu) return;
+  fu[ref.field]=newDate;
+  persist(); fuRender(); toast('Áthelyezve');
 }
 
 function makeFuCard(fu, field) {
@@ -925,6 +935,14 @@ function makeFuCard(fu, field) {
     <div class="cn">${esc(fu.name)}</div>${coLine}${emailLine}${noteLine}
     <div class="cfoot"><button class="cbtn" onclick="markDone('${fu.id}','${field}',event)">✓</button></div>`;
   card.addEventListener('click', e=>{ if(e.target.closest('.cbtn')) return; openFuModal(fu.id); });
+  if(window.matchMedia('(pointer:fine)').matches){
+    card.draggable=true;
+    card.addEventListener('dragstart',function(ev){
+      ev.dataTransfer.setData('application/fu-card',JSON.stringify({fuId:fu.id,field:field}));
+      ev.dataTransfer.effectAllowed='move'; this.style.opacity='0.4';
+    });
+    card.addEventListener('dragend',function(){ this.style.opacity=''; });
+  }
   return card;
 }
 function makeLeadFUCard(vfu, lead, type) {
@@ -1219,9 +1237,6 @@ buildPresenceBoard();
 checkScheduled();
 renderAll();
 pullState(true);
-['important','low'].forEach(p=>{
-  document.getElementById('input-'+p).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addManual(p);}});
-});
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
