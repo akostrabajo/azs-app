@@ -467,7 +467,9 @@ function setDot(cls) { dot().className = 'sync-dot' + (cls ? ' ' + cls : ''); }
 async function api(payload) {
   if (!cfg.apiUrl || !cfg.token) throw new Error('nincs beállítva');
   var body = JSON.stringify(Object.assign({ token: cfg.token }, payload));
-  var res = await fetch(cfg.apiUrl, { method: 'POST', body: body });
+  var encoded = btoa(unescape(encodeURIComponent(body)));
+  var url = cfg.apiUrl + '?d=' + encodeURIComponent(encoded);
+  var res = await fetch(url);
   var text = await res.text();
   var j;
   try { j = JSON.parse(text); } catch (e) { throw new Error('Nem JSON válasz: ' + text.slice(0, 100)); }
@@ -1193,7 +1195,9 @@ async function testConnection() {
   const url=document.getElementById('set-url').value.trim();
   const token=document.getElementById('set-token').value.trim();
   try {
-    const res=await fetch(url,{method:'POST',body:JSON.stringify({token:token,action:'pull'})});
+    var body=JSON.stringify({token:token,action:'pull'});
+    var encoded=btoa(unescape(encodeURIComponent(body)));
+    const res=await fetch(url+'?d='+encodeURIComponent(encoded));
     const text=await res.text();
     var j; try { j=JSON.parse(text); } catch(pe) { st.textContent='Nem JSON válasz: '+text.slice(0,80); st.className='set-status err'; return; }
     if(j.ok){ st.textContent='Kapcsolat él.'; st.className='set-status ok'; }
