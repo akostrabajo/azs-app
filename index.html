@@ -490,12 +490,11 @@ function setDot(cls) { dot().className = 'sync-dot' + (cls ? ' ' + cls : ''); }
 
 async function api(payload) {
   if (!cfg.apiUrl || !cfg.token) throw new Error('nincs beállítva');
-  const res = await fetch(cfg.apiUrl, {
-    method: 'POST', redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ token: cfg.token }, payload)),
-  });
-  const j = await res.json();
+  var body = JSON.stringify(Object.assign({ token: cfg.token }, payload));
+  var res = await fetch(cfg.apiUrl, { method: 'POST', body: body });
+  var text = await res.text();
+  var j;
+  try { j = JSON.parse(text); } catch (e) { throw new Error('Nem JSON válasz: ' + text.slice(0, 100)); }
   if (!j.ok) throw new Error(j.error || 'hiba');
   return j;
 }
@@ -535,7 +534,7 @@ async function pullState(silent) {
     renderAll();
   } catch (e) {
     setDot('err');
-    if (!silent) toast('Szinkron hiba – ellenőrizd a beállításokat');
+    if (!silent) toast('Szinkron hiba: ' + (e.message || e));
   }
 }
 function syncNow() { pullState(false); }
@@ -1168,11 +1167,12 @@ async function testConnection() {
   const url=document.getElementById('set-url').value.trim();
   const token=document.getElementById('set-token').value.trim();
   try {
-    const res=await fetch(url,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({token,action:'pull'})});
-    const j=await res.json();
+    const res=await fetch(url,{method:'POST',body:JSON.stringify({token:token,action:'pull'})});
+    const text=await res.text();
+    var j; try { j=JSON.parse(text); } catch(pe) { st.textContent='Nem JSON válasz: '+text.slice(0,80); st.className='set-status err'; return; }
     if(j.ok){ st.textContent='Kapcsolat él.'; st.className='set-status ok'; }
     else { st.textContent='Hiba: '+(j.error||'ismeretlen'); st.className='set-status err'; }
-  } catch(e){ st.textContent='Nem érhető el.'; st.className='set-status err'; }
+  } catch(e){ st.textContent='Nem érhető el: '+e.message; st.className='set-status err'; }
 }
 function doImport() {
   const raw=document.getElementById('set-import').value.trim();
